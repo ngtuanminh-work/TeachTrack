@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TeachTrack Pro</title>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav>
+  <div class="brand">Teach<span>Track</span></div>
+  <div class="tab active" onclick="showTab('dashboard',this)">📊 Tổng quan</div>
+  <div class="tab" onclick="showTab('schedules',this)">📅 Lớp & Lịch</div>
+  <div class="tab" onclick="showTab('sessions',this)">📝 Buổi dạy</div>
+  <div class="tab" onclick="showTab('students',this)">👥 Điểm danh</div>
+  <div class="tab" onclick="showTab('absences',this)">🏖️ Báo nghỉ</div>
+  <div class="tab" onclick="showTab('settings',this)">⚙️ Cài đặt</div>
+</nav>
+
+<div class="wrap">
+
+<div class="page active" id="page-dashboard">
+  <div class="sec-hdr">
+    <div class="sec-title">Tổng quan</div>
+    <div class="filter-bar" style="margin:0">
+      <label>Tháng:</label>
+      <input type="month" id="dash-month" onchange="renderDashboard()" style="width:145px">
+    </div>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div class="charts-grid">
+    <div class="ccrd"><div class="ctitle">💰 Thu nhập theo tháng</div><canvas id="monthChart" height="200"></canvas></div>
+    <div class="ccrd"><div class="ctitle">📚 Thu nhập theo lớp</div><canvas id="classChart" height="200"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-title">⚠️ Lớp sắp kết thúc</div>
+    <div id="ending-list"></div>
+  </div>
+</div>
+
+<div class="page" id="page-schedules">
+  <div class="sec-hdr">
+    <div class="sec-title">Quản lý Lớp & Lịch cố định</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-g" onclick="markCompletedSchedules()" title="Chuyển các lớp đã học xong số buổi sang trạng thái Đã Kết Thúc">📦 Đóng sổ nhanh</button>
+      <button class="btn btn-p" onclick="openScheduleModal()">+ Thêm Lớp mới</button>
+    </div>
+  </div>
+  
+  <div class="card" style="padding:0">
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Lớp / Học sinh</th><th>Lịch học (Hệ 24h)</th><th>HS</th>
+          <th>Buổi còn lại</th><th>Dự kiến KT</th><th>Tiến độ</th><th></th>
+        </tr></thead>
+        <tbody id="sched-list"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="page" id="page-sessions">
+  <div class="sec-hdr">
+    <div class="sec-title">Nhật ký Buổi dạy</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-g" onclick="openSessionModal()">+ Thêm thủ công</button>
+      <button class="btn btn-grn" onclick="exportExcel()">📥 Xuất Excel</button>
+    </div>
+  </div>
+  <div class="filter-bar">
+    <label>Tháng:</label>
+    <input type="month" id="sess-month" onchange="renderSessions()" style="width:145px">
+    <label>Lớp:</label>
+    <select id="sess-class" onchange="renderSessions()" style="width:155px">
+      </select>
+  </div>
+  <div class="card" style="padding:0">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Ngày</th><th>Lớp</th><th>Giờ học</th><th>HS</th><th>Phút</th><th>Thu nhập</th><th>Ghi chú</th><th></th></tr></thead>
+        <tbody id="sess-list"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card" id="sess-summary" style="display:none"></div>
+</div>
+
+<div class="page" id="page-students">
+  <div class="sec-hdr">
+    <div class="sec-title">Điểm danh & Biến động sĩ số</div>
+  </div>
+  <div class="card">
+    <div class="row">
+      <div class="fg">
+        <label>Chọn lớp cần điều chỉnh</label>
+        <select id="stu-class-select" onchange="renderStudentTab()"></select>
+      </div>
+    </div>
+  </div>
+  
+  <div class="charts-grid" style="grid-template-columns: 1.5fr 1fr;">
+      <div class="card" style="margin-bottom:0">
+        <div class="card-title">Danh sách hiện tại (<span id="stu-tab-count">0</span> HS)</div>
+        <div id="stu-tab-list"></div>
+      </div>
+      
+      <div class="card" style="margin-bottom:0; background: var(--surface2)">
+        <div class="card-title">Thêm học sinh mới vào lớp</div>
+        <div class="fg" style="margin-bottom:10px">
+            <label id="stu-tab-new-name-label">Tên học sinh mới</label>
+            <input type="text" id="stu-tab-new-name" placeholder="VD: Tuấn Kiệt">
+        </div>
+        <div class="fg" style="margin-bottom:15px">
+            <label>Bắt đầu học từ ngày</label>
+            <input type="date" id="stu-tab-new-date">
+        </div>
+        <button class="btn btn-p" style="width:100%" onclick="tabAddStudent()">+ Thêm vào lớp</button>
+        <p style="font-size:11px; color:var(--muted); margin-top:10px;">Hệ thống sẽ tự động cập nhật biên lai tiền lương các buổi học từ ngày này trở đi.</p>
+      </div>
+  </div>
+</div>
+
+<div class="page" id="page-absences">
+  <div class="sec-title" style="margin-bottom:18px">Báo nghỉ (Xin phép nguyên Lớp)</div>
+  <div class="card">
+    <div class="card-title">Thêm ngày xin nghỉ cho cả lớp</div>
+    <div class="row">
+      <div class="fg"><label>Chọn lớp xin nghỉ</label><select id="abs-class"></select></div>
+      <div class="fg"><label>Ngày nghỉ</label><input type="date" id="abs-date"></div>
+      <div class="fg" style="flex:0;justify-content:flex-end"><label>&nbsp;</label><button class="btn btn-p" onclick="addAbsence()">+ Thêm</button></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Lịch sử xin nghỉ các lớp</div>
+    <div id="abs-list"></div>
+  </div>
+</div>
+
+<div class="page" id="page-settings">
+  <div class="sec-title" style="margin-bottom:18px">Cài đặt</div>
+  <div class="card">
+    <div class="card-title">💰 Lương theo giờ (đồng/giờ)</div>
+    <div class="row">
+      <div class="fg"><label>Lương cơ bản (1 HS)</label><input type="number" id="rateBase" step="5000"></div>
+      <div class="fg"><label>Cộng thêm / 1 HS (0 = Không tăng)</label><input type="number" id="rateExtra" step="1000" placeholder="0"></div>
+      <div class="fg" style="flex:0;justify-content:flex-end"><label>&nbsp;</label><button class="btn btn-p" onclick="saveRates()">Lưu</button></div>
+    </div>
+    <div id="rate-preview" style="font-size:12px;color:var(--muted);margin-top:8px"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">💾 Sao lưu & Khôi phục</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+      <button class="btn btn-g" onclick="exportBackup()">📤 Tải dữ liệu xuống</button>
+      <label class="btn btn-g" style="cursor:pointer">📥 Khôi phục dữ liệu<input type="file" accept=".json" style="display:none" onchange="importBackup(event)"></label>
+    </div>
+    <div id="backup-info" style="font-size:12px;color:var(--muted)"></div>
+  </div>
+</div>
+
+</div><div class="overlay" id="modal-sched" style="display:none">
+  <div class="modal">
+    <div class="modal-title" id="msch-title">Thêm Lớp & Lịch mới</div>
+    
+    <div class="row">
+      <div class="fg" style="flex:2">
+        <label>Tên Lớp / Học sinh (Phân cách bằng dấu - hoặc ,)</label>
+        <input type="text" id="msch-name" placeholder="VD: Bá Khôi - Thu Ngọc" oninput="autoCountStudents(this.value)">
+      </div>
+      <div class="fg" style="flex:0; min-width:80px">
+        <label>Số HS</label>
+        <input type="number" id="msch-stu" value="1" min="1" required>
+      </div>
+    </div>
+
+    <div class="card-title" style="margin-top:15px; margin-bottom:5px">Lịch học trong tuần</div>
+    <div class="day-toggles">
+      <div class="dtog" id="dtog-1" onclick="toggleDay(1)">T2</div>
+      <div class="dtog" id="dtog-2" onclick="toggleDay(2)">T3</div>
+      <div class="dtog" id="dtog-3" onclick="toggleDay(3)">T4</div>
+      <div class="dtog" id="dtog-4" onclick="toggleDay(4)">T5</div>
+      <div class="dtog" id="dtog-5" onclick="toggleDay(5)">T6</div>
+      <div class="dtog" id="dtog-6" onclick="toggleDay(6)">T7</div>
+      <div class="dtog" id="dtog-0" onclick="toggleDay(0)">CN</div>
+    </div>
+    <div id="time-inputs-container" style="margin-bottom:15px"></div>
+
+    <div class="row">
+      <div class="fg"><label>Ngày bắt đầu (Khai giảng)</label><input type="date" id="msch-sdate"></div>
+      <div class="fg"><label>Tổng số buổi (0 = vô hạn)</label><input type="number" id="msch-total" placeholder="VD: 20" min="0" value="0"></div>
+    </div>
+    <input type="hidden" id="msch-id">
+    <div class="modal-btns">
+      <button class="btn btn-g" onclick="closeModal('modal-sched')">Hủy</button>
+      <button class="btn btn-p" onclick="saveSchedule()">Lưu Lớp</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="modal-sess" style="display:none">
+  <div class="modal">
+    <div class="modal-title">Thêm/Sửa buổi dạy</div>
+    <div class="row">
+      <div class="fg"><label>Lớp</label><select id="mse-class" onchange="updateManualStudentCount()"></select></div>
+      <div class="fg"><label>Ngày</label><input type="date" id="mse-date"></div>
+    </div>
+    <div class="row">
+      <div class="fg"><label>Giờ bắt đầu</label><input type="text" id="mse-start" placeholder="VD: 08:30" maxlength="5" oninput="formatTime(this)"></div>
+      <div class="fg"><label>Giờ kết thúc</label><input type="text" id="mse-end" placeholder="VD: 10:00" maxlength="5" oninput="formatTime(this)"></div>
+      <div class="fg"><label>Số HS (Có thể sửa)</label><input type="number" id="mse-stu" value="1" min="1" required></div>
+    </div>
+    <div class="fg" style="margin-bottom:4px"><label>Ghi chú (tuỳ chọn)</label><input type="text" id="mse-note" placeholder="Vắng bạn A, học bù..."></div>
+    
+    <input type="hidden" id="mse-id">
+    
+    <div class="modal-btns">
+      <button class="btn btn-g" onclick="closeModal('modal-sess')">Hủy</button>
+      <button class="btn btn-p" onclick="saveManualSession()">Lưu buổi</button>
+    </div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
