@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -33,8 +34,8 @@
   </div>
   <div class="stats" id="stats"></div>
   <div class="charts-grid">
-    <div class="ccrd"><div class="ctitle">💰 Thu nhập theo tháng</div><canvas id="monthChart" height="200"></canvas></div>
-    <div class="ccrd"><div class="ctitle">📚 Thu nhập theo lớp</div><canvas id="classChart" height="200"></canvas></div>
+    <div class="ccrd"><div class="ctitle">💰 Thu nhập theo tháng</div><div style="position:relative;height:200px"><canvas id="monthChart"></canvas></div></div>
+    <div class="ccrd"><div class="ctitle">📚 Thu nhập theo lớp</div><div style="position:relative;height:200px"><canvas id="classChart"></canvas></div></div>
   </div>
   <div class="card">
     <div class="card-title">⚠️ Lớp sắp kết thúc</div>
@@ -46,6 +47,7 @@
   <div class="sec-hdr">
     <div class="sec-title">Quản lý Lớp & Lịch cố định</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-g" onclick="openTrashModal()" title="Thùng rác - xem và phục hồi các lớp đã kết thúc hoặc xoá">🗑 Thùng rác</button>
       <button class="btn btn-g" onclick="markCompletedSchedules()" title="Chuyển các lớp đã học xong số buổi sang trạng thái Đã Kết Thúc">📦 Đóng sổ nhanh</button>
       <button class="btn btn-p" onclick="openScheduleModal()">+ Thêm Lớp mới</button>
     </div>
@@ -69,6 +71,7 @@
     <div class="sec-title">Nhật ký Buổi dạy</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-g" onclick="openSessionModal()">+ Thêm thủ công</button>
+      <button class="btn btn-g" onclick="openSessionTrashModal()">🗑 Thùng rác</button>
       <button class="btn btn-grn" onclick="exportExcel()">📥 Xuất Excel</button>
     </div>
   </div>
@@ -94,23 +97,24 @@
   <div class="sec-hdr">
     <div class="sec-title">Điểm danh & Biến động sĩ số</div>
   </div>
-  <div class="card">
+  <div class="card" style="margin-bottom: 16px;">
     <div class="row">
       <div class="fg">
-        <label>Chọn lớp cần điều chỉnh</label>
-        <select id="stu-class-select" onchange="renderStudentTab()"></select>
+        <label>Chọn lớp cần điểm danh</label>
+        <select id="stu-class-select" onchange="renderAttendanceTab()"></select>
       </div>
     </div>
+    <div id="stu-dates-container" class="date-toggles-wrapper" style="margin-bottom:0"></div>
   </div>
   
   <div class="charts-grid" style="grid-template-columns: 1.5fr 1fr;">
-      <div class="card" style="margin-bottom:0">
-        <div class="card-title">Danh sách hiện tại (<span id="stu-tab-count">0</span> HS)</div>
-        <div id="stu-tab-list"></div>
+      <div class="card" id="stu-attendance-card" style="display:none; margin-bottom:0">
+        <div class="card-title">Danh sách buổi học ngày <span id="stu-att-date-title" style="color:var(--accent)"></span></div>
+        <div id="stu-att-list"></div>
       </div>
       
-      <div class="card" style="margin-bottom:0; background: var(--surface2)">
-        <div class="card-title">Thêm học sinh mới vào lớp</div>
+      <div class="card" id="stu-new-card" style="display:none; margin-bottom:0; background: var(--surface2)">
+        <div class="card-title">Thêm học sinh mới / Giảm sĩ số</div>
         <div class="fg" style="margin-bottom:10px">
             <label id="stu-tab-new-name-label">Tên học sinh mới</label>
             <input type="text" id="stu-tab-new-name" placeholder="VD: Tuấn Kiệt">
@@ -119,8 +123,10 @@
             <label>Bắt đầu học từ ngày</label>
             <input type="date" id="stu-tab-new-date">
         </div>
-        <button class="btn btn-p" style="width:100%" onclick="tabAddStudent()">+ Thêm vào lớp</button>
-        <p style="font-size:11px; color:var(--muted); margin-top:10px;">Hệ thống sẽ tự động cập nhật biên lai tiền lương các buổi học từ ngày này trở đi.</p>
+        <button class="btn btn-p" style="width:100%; margin-bottom:10px" onclick="tabAddStudent()">+ Thêm vào lớp</button>
+        <hr style="border:0; border-top:1px dashed var(--border); margin: 15px 0;">
+        <p style="font-size:11px; color:var(--muted); margin-bottom:8px">Mẹo: Để cho học sinh nghỉ hẳn, hãy click chọn 1 ngày ở bảng bên trái, tìm tên HS và bấm Nút "Nghỉ luôn".</p>
+        <div id="stu-drop-count-container"></div>
       </div>
   </div>
 </div>
@@ -128,15 +134,26 @@
 <div class="page" id="page-absences">
   <div class="sec-title" style="margin-bottom:18px">Báo nghỉ (Xin phép nguyên Lớp)</div>
   <div class="card">
-    <div class="card-title">Thêm ngày xin nghỉ cho cả lớp</div>
-    <div class="row">
-      <div class="fg"><label>Chọn lớp xin nghỉ</label><select id="abs-class"></select></div>
-      <div class="fg"><label>Ngày nghỉ</label><input type="date" id="abs-date"></div>
-      <div class="fg" style="flex:0;justify-content:flex-end"><label>&nbsp;</label><button class="btn btn-p" onclick="addAbsence()">+ Thêm</button></div>
+    <div class="fg" style="margin-bottom:15px"><label>Chọn lớp cần báo nghỉ</label><select id="abs-class" onchange="renderAbsenceDates()"></select></div>
+    <div id="abs-dates-container" class="date-toggles-wrapper"></div>
+    <div id="abs-detail" style="display:none; padding:15px; background:var(--surface2); border-radius:var(--rs); border:1px dashed var(--border)">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px">
+            <div>
+                <h4 id="abs-detail-title" style="margin-bottom:4px; font-size:14px;"></h4>
+                <p style="font-size:12px; color:var(--muted)">Việc báo nghỉ sẽ tự động huỷ lương và không tính buổi này vào tiến độ.</p>
+            </div>
+            <button id="btn-toggle-class-absent" class="btn" style="min-width:180px"></button>
+        </div>
     </div>
   </div>
   <div class="card">
-    <div class="card-title">Lịch sử xin nghỉ các lớp</div>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px;">
+        <div class="card-title" style="margin:0">Lịch sử xin nghỉ các lớp</div>
+        <div style="display:flex;gap:8px">
+            <button class="btn btn-g btn-sm" onclick="hideAllAbsences()">🧹 Ẩn danh sách</button>
+            <button class="btn btn-g btn-sm" onclick="openAbsenceTrashModal()">🗑 Thùng rác</button>
+        </div>
+    </div>
     <div id="abs-list"></div>
   </div>
 </div>
@@ -144,13 +161,16 @@
 <div class="page" id="page-settings">
   <div class="sec-title" style="margin-bottom:18px">Cài đặt</div>
   <div class="card">
-    <div class="card-title">💰 Lương theo giờ (đồng/giờ)</div>
+    <div class="card-title">💰 Cài đặt Lương</div>
     <div class="row">
-      <div class="fg"><label>Lương cơ bản (1 HS)</label><input type="number" id="rateBase" step="5000"></div>
-      <div class="fg"><label>Cộng thêm / 1 HS (0 = Không tăng)</label><input type="number" id="rateExtra" step="1000" placeholder="0"></div>
-      <div class="fg" style="flex:0;justify-content:flex-end"><label>&nbsp;</label><button class="btn btn-p" onclick="saveRates()">Lưu</button></div>
+      <div class="fg"><label>Lương (1 HS)</label><input type="number" id="rateBase" step="5000"></div>
+      <div class="fg"><label>Trong bao nhiêu phút?</label><input type="number" id="rateMinutes" step="5" placeholder="VD: 60"></div>
+      <div class="fg"><label>Cộng thêm / 1 HS (âm = giảm tiền)</label><input type="number" id="rateExtra" step="1000" placeholder="VD: 20000 hoặc -10000"></div>
+      <div class="fg"><label>Áp dụng từ ngày</label><input type="date" id="rateDate"></div>
+      <div class="fg" style="flex:0;justify-content:flex-end"><label>&nbsp;</label><button class="btn btn-p" onclick="saveRates()">➕ Thêm</button></div>
     </div>
     <div id="rate-preview" style="font-size:12px;color:var(--muted);margin-top:8px"></div>
+    <div id="rate-history-list" style="margin-top:14px"></div>
   </div>
   <div class="card">
     <div class="card-title">💾 Sao lưu & Khôi phục</div>
@@ -162,14 +182,61 @@
   </div>
 </div>
 
-</div><div class="overlay" id="modal-sched" style="display:none">
+</div>
+
+<div class="overlay" id="modal-trash" style="display:none">
+  <div class="modal" style="max-width:660px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:8px">
+      <div class="modal-title" style="margin:0">🗑 Thùng rác</div>
+      <button class="btn btn-r btn-sm" onclick="permDeleteAllTrash()">🗑 Xoá vĩnh viễn tất cả</button>
+    </div>
+    <div id="trash-list"></div>
+    <div class="modal-btns" style="margin-top:14px">
+      <button class="btn btn-g" onclick="closeModal('modal-trash')">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="modal-sess-trash" style="display:none">
+  <div class="modal" style="max-width:660px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:8px">
+      <div class="modal-title" style="margin:0">🗑 Thùng rác Buổi dạy</div>
+      <button class="btn btn-r btn-sm" onclick="permDeleteAllSessionTrash()">🗑 Xoá vĩnh viễn tất cả</button>
+    </div>
+    <div id="sess-trash-list"></div>
+    <div class="modal-btns" style="margin-top:14px">
+      <button class="btn btn-g" onclick="closeModal('modal-sess-trash')">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="modal-abs-trash" style="display:none">
+  <div class="modal" style="max-width:660px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:8px">
+      <div class="modal-title" style="margin:0">🗑 Thùng rác Báo nghỉ</div>
+      <button class="btn btn-r btn-sm" onclick="permDeleteAllAbsenceTrash()">🗑 Xoá vĩnh viễn tất cả</button>
+    </div>
+    <div id="abs-trash-list"></div>
+    <div class="modal-btns" style="margin-top:14px">
+      <button class="btn btn-g" onclick="closeModal('modal-abs-trash')">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="modal-sched" style="display:none">
   <div class="modal">
     <div class="modal-title" id="msch-title">Thêm Lớp & Lịch mới</div>
-    
     <div class="row">
       <div class="fg" style="flex:2">
         <label>Tên Lớp / Học sinh (Phân cách bằng dấu - hoặc ,)</label>
         <input type="text" id="msch-name" placeholder="VD: Bá Khôi - Thu Ngọc" oninput="autoCountStudents(this.value)">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;flex:0;min-width:auto">
+        <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Màu</label>
+        <div style="position:relative">
+          <div id="msch-color-btn" class="color-btn" onclick="toggleColorPicker()" title="Chọn màu lớp"></div>
+          <div id="msch-color-popover" class="color-popover" style="display:none"></div>
+        </div>
       </div>
       <div class="fg" style="flex:0; min-width:80px">
         <label>Số HS</label>
@@ -194,6 +261,7 @@
       <div class="fg"><label>Tổng số buổi (0 = vô hạn)</label><input type="number" id="msch-total" placeholder="VD: 20" min="0" value="0"></div>
     </div>
     <input type="hidden" id="msch-id">
+    <input type="hidden" id="msch-color" value="#f0b429">
     <div class="modal-btns">
       <button class="btn btn-g" onclick="closeModal('modal-sched')">Hủy</button>
       <button class="btn btn-p" onclick="saveSchedule()">Lưu Lớp</button>
@@ -211,12 +279,10 @@
     <div class="row">
       <div class="fg"><label>Giờ bắt đầu</label><input type="text" id="mse-start" placeholder="VD: 08:30" maxlength="5" oninput="formatTime(this)"></div>
       <div class="fg"><label>Giờ kết thúc</label><input type="text" id="mse-end" placeholder="VD: 10:00" maxlength="5" oninput="formatTime(this)"></div>
-      <div class="fg"><label>Số HS (Có thể sửa)</label><input type="number" id="mse-stu" value="1" min="1" required></div>
+      <div class="fg"><label>Số HS (Có thể sửa)</label><input type="number" id="mse-stu" value="1" min="0" required></div>
     </div>
     <div class="fg" style="margin-bottom:4px"><label>Ghi chú (tuỳ chọn)</label><input type="text" id="mse-note" placeholder="Vắng bạn A, học bù..."></div>
-    
     <input type="hidden" id="mse-id">
-    
     <div class="modal-btns">
       <button class="btn btn-g" onclick="closeModal('modal-sess')">Hủy</button>
       <button class="btn btn-p" onclick="saveManualSession()">Lưu buổi</button>
@@ -225,5 +291,6 @@
 </div>
 
 <script src="script.js"></script>
+
 </body>
 </html>
